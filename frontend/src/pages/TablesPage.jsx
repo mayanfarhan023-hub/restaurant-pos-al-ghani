@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api';
-import { Save, Printer, X, Check, Table, DollarSign, CreditCard, StickyNote } from 'lucide-react';
+import { Save, Printer, X, Check, DollarSign, Plus } from 'lucide-react';
 
-const TABLE_NUMBERS = [1, 2, 3];
+const MAX_TABLES = 5;
 
 export default function TablesPage() {
   const [sales, setSales] = useState([]);
@@ -17,20 +17,42 @@ export default function TablesPage() {
     fetchSales();
   }, []);
 
-  const openTable = (table) => {
-    const existing = sales.find((s) => s.table_number === table && s.status === 'open');
-    if (existing) {
-      setOpenSale(existing);
-    } else {
-      setOpenSale({ table_number: table, bill_amount: '', payment_method: 'cash', notes: '' });
+  const openSales = sales.filter((s) => s.status === 'open');
+
+  const getNextTableNumber = () => {
+    const used = new Set(openSales.map((s) => s.table_number));
+    if (openSales.length === 0) return 1;
+    const maxUsed = Math.max(0, ...openSales.map((s) => s.table_number));
+    const next = maxUsed + 1;
+    if (next <= MAX_TABLES) return next;
+    for (let i = 1; i <= MAX_TABLES; i++) {
+      if (!used.has(i)) return i;
     }
+    return null;
+  };
+
+  const addTable = () => {
+    const next = getNextTableNumber();
+    if (!next) {
+      setMessage('All 5 tables are occupied. Close a table to add a new one.');
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
+    setOpenSale({
+      table_number: next,
+      bill_amount: '',
+      payment_method: 'cash',
+      notes: '',
+    });
   };
 
   const save = async () => {
     try {
       const payload = {
-        ...openSale,
+        table_number: openSale.table_number,
         bill_amount: Number(openSale.bill_amount),
+        payment_method: openSale.payment_method,
+        notes: openSale.notes,
       };
       if (openSale.id) {
         await api.put(`/table-sales/${openSale.id}`, payload);
@@ -72,37 +94,27 @@ export default function TablesPage() {
     .filter((s) => s.status === 'closed')
     .reduce((sum, s) => sum + Number(s.bill_amount), 0);
 
+  const canAdd = openSales.length < MAX_TABLES;
+  const nextNumber = getNextTableNumber();
+
   return (
     <div className="h-full overflow-y-auto p-4 lg:p-6 bg-slate-900 text-white">
       <h2 className="text-2xl font-bold mb-4">Tables</h2>
       {message && <div className="mb-4 p-3 rounded-lg bg-green-500/20 text-green-300 text-sm">{message}</div>}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        {TABLE_NUMBERS.map((t) => {
-          const open = sales.find((s) => s.table_number === t && s.status === 'open');
-          return (
-            <button
-              key={t}
-              onClick={() => openTable(t)}
-              className={`p-5 rounded-2xl border text-left transition ${
-                open ? 'bg-brand-500/20 border-brand-500' : 'bg-slate-800 border-slate-700 hover:border-slate-500'
-              }`}
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <Table size={20} />
-                <span className="font-bold text-lg">Table {t}</span>
-              </div>
-              {open ? (
-                <div className="text-sm text-slate-300">
-                  <div>Bill: Rs. {Number(open.bill_amount).toFixed(2)}</div>
-                  <div>{open.payment_method}</div>
-                </div>
-              ) : (
-                <div className="text-sm text-slate-400">Tap to open table</div>
-              )}
-            </button>
-          );
-        })}
+      <div className="mb-6">
+        <button
+          onClick={addTable}
+          disabled={!canAdd}
+          className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-medium text-sm transition ${
+            canAdd
+              ? 'bg-brand-500 hover:bg-brand-600 text-slate-900'
+              : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+          }`}
+        >
+          <Plus size={18} />
+          {canAdd ? `Add Table ${nextNumber}` : 'All 5 tables occupied'}
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -168,7 +180,7 @@ export default function TablesPage() {
           </div>
         )}
 
-        <div className="lg:col-span-2 bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
+        <div className={`bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden ${openSale ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
           <div className="p-4 border-b border-slate-700 flex justify-between items-center">
             <h3 className="font-bold">Table Sales History</h3>
             <span className="text-sm text-slate-400">Closed total: Rs. {closedTotal.toFixed(2)}</span>
