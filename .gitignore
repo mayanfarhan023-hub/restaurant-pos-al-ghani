@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.db
+.venv/
+venv/
+ENV/
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.cache/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
